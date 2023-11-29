@@ -34,10 +34,9 @@ class Brevets(Resource):
         return Response(brevets, mimetype="application/json", status=200)
 
     def post(self):
-        data = request.get_json()
-        brevet = Brevet(**data)
-        brevet.save()
-        return {"message": "Brevet created successfully"}, 201
+        input_json = request.json
+        brevet = Brevet(**input_json).save()
+        return {'_id': str(brevet.id)}, 200
 
 
 

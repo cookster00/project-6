@@ -29,17 +29,15 @@ from database.models import Brevet
 # JSON for you.
 
 class Brevet(Resource):
-    def get(self, brevet_id):
-        brevet = Brevet.objects.get(id=brevet_id)
-        return Response(brevet.to_json(), mimetype="application/json", status=200)
+    def get(self, id):
+        brevet = Brevet.objects.get(id=id).to_json()
+        return Response(brevet, mimetype="application/json", status=200)
 
-    def put(self, brevet_id):
-        brevet = Brevet.objects.get(id=brevet_id)
-        data = request.get_json()
-        brevet.update(**data)
+    def put(self, id):
+        input_json = request.json
+        Brevet.objects.get(id=id).update(**input_json)
         return {"message": "Brevet updated successfully"}, 200
 
-    def delete(self, brevet_id):
-        brevet = Brevet.objects.get(id=brevet_id)
-        brevet.delete()
+    def delete(self, id):
+        Brevet.objects.get(id=id).delete()
         return {"message": "Brevet deleted successfully"}, 200

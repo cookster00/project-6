@@ -5,115 +5,164 @@ following rules described at https://rusa.org/octime_acp.html
 and https://rusa.org/pages/rulesForRiders
 """
 import arrow
+import math
 
-# Initializing global variables of each distance span with the following information included:
-#   start_dist -> beginning of distance 
-#   end_dist -> ending distance
-#   max_speed -> maximum speed a rider is allowed to bike
-#   min_speed -> minimum speed a rider is allowed to bike 
-#   quickest -> amount of time it would take to ride span from front to end at max speed.
-#       Format: [hours, minutes]
-#   slowest -> amount of time it would take to ride span from front to end at minimum speed.
-#       Format: [hours, minutes]
-span1 = {'start_dist': 0, 'end_dist': 200, 'max_speed': 34, 'min_speed': 15}
-span2 = {'start_dist': 200, 'end_dist': 400, 'max_speed': 32, 'min_speed': 15}
-span3 = {'start_dist': 400, 'end_dist': 600, 'max_speed': 30, 'min_speed': 15}
-span4 = {'start_dist': 600, 'end_dist': 1000, 'max_speed': 28, 'min_speed': 11.428}
 
-# Initializing global variable of a list of all distance spans
-dist_spans = [span1, span2, span3, span4]
+# Create dictionaries for the specified time and location values
+control_0_2 = {'start_dist': 0, 'end_dist': 200, 'min_speed': 15, 'max_speed': 34}
+control_2_4 = {'start_dist': 200, 'end_dist': 400, 'min_speed': 15, 'max_speed': 32}
+control_4_6 = {'start_dist': 400, 'end_dist': 600, 'min_speed': 15, 'max_speed': 30}
+control_6_10 = {'start_dist': 600, 'end_dist': 1000, 'min_speed': 11.428, 'max_speed': 28}
+
+
+def control_calc(control, speed):
+    raw_time = control / speed
+    hour = math.floor(raw_time)
+    frac_minutes = raw_time - hour
+    minute = round(frac_minutes * 60)
+    return_val = {'hour': hour, 'minute': minute}
+    return raw_time
+
+
+def convert_to_hm(raw_time):
+    hour = math.floor(raw_time)
+    frac_minutes = raw_time - hour
+    minute = round(frac_minutes * 60)
+    return_val = {'hour': hour, 'minute': minute}
+    return return_val
+
 
 def open_time(control_dist_km, brevet_dist_km, brevet_start_time):
     """
     Args:
-       control_dist_km:  number, control distance in kilometers // Spot of checkpoint
-       brevet_dist_km: number, nominal distance of the brevet   // Overall distance of the race
-           in kilometers, which must be one of 200, 300, 400, 600,
-           or 1000 (the only official ACP brevet distances)
-       brevet_start_time:  An arrow object                      // when the race starts
+        control_dist_km:  number, control distance in kilometers
+        brevet_dist_km: number, nominal distance of the brevet
+            in kilometers, which must be one of 200, 300, 400, 600,
+            or 1000 (the only official ACP brevet distances)
+        brevet_start_time:  An arrow object
     Returns:
-       An arrow object indicating the control open time.
-       This will be in the same time zone as the brevet start time.
+        An arrow object indicating the control open time.
+        This will be in the same time zone as the brevet start time.
     """
+    time = arrow.get(brevet_start_time)
+    hour = 0
+    minute = 0
 
-    if control_dist_km < 0:
-        # control distance is neg
-        raise ValueError
-    elif control_dist_km == 0:
-        # control distance is 0
-        return brevet_start_time
-    elif control_dist_km > int(brevet_dist_km):
-        control_dist_km = int(brevet_dist_km)
+    # if the control is longer than the brevet, the calculation should be with brevet instead
+    if control_dist_km > brevet_dist_km:
+        control = brevet_dist_km
+    else:
+        control = control_dist_km
 
-    control_open_time = brevet_start_time
-    hour_shift = 0
-    minute_shift = 0
-    log = ""
+    if control <= 200:
+        raw_time = control_calc(control, control_0_2['max_speed'])
+        time_result = convert_to_hm(raw_time)
+        hour = time_result['hour']
+        minute = time_result['minute']
+    elif control <= 400:
+        # calculate when distance is <=200
+        raw_time_1 = control_calc(200, control_0_2['max_speed'])
 
-    for dist_span in dist_spans:
-        # if the control checkpoint is within the selected distance span, then begin to calculate using information from dist_span
-        if dist_span['start_dist'] < control_dist_km <= dist_span['end_dist']:
-            log += "entering if with control_open_time = {}".format(control_open_time)
-            # Calculates the time to checkpoint if rider is moving at max speed (aka the controls opening time):
-            fastest = (control_dist_km - dist_span['start_dist']) / dist_span['max_speed']
+        # calculate when distance is >200
+        remain_control_dist = control - 200
+        raw_time_2 = control_calc(remain_control_dist, control_2_4['max_speed'])
 
-            # Seperating fastest_time_to_control into hours and minutes that it takes
-            minute_shift += fastest * 60
+        total_raw_time = raw_time_1 + raw_time_2
+        time_result = convert_to_hm(total_raw_time)
 
-            # Got to the given checkpoint and can return overall time now
-            break
-        
-        # If the control distance is not within this distance span, add the total_quickest_time of the span to account for distance, and then we can re-enter loop
-        else:
-            log += "entering else with control_open_time = {}".format(control_open_time)
-            added = (dist_span['end_dist'] - dist_span['start_dist']) / dist_span['max_speed']
-            minute_shift += added * 60
-            log += "exiting else with control_open_time = {}".format(control_open_time)
-    
-    control_open_time = control_open_time.shift(minutes=+round(minute_shift))
-    return control_open_time
+        hour = time_result['hour']
+        minute = time_result['minute']
+    elif control <= 600:
+        # calculate when distance is <=200
+        raw_time_1 = control_calc(200, control_0_2['max_speed'])
+
+        # calculate when distance is <=400
+        raw_time_2 = control_calc(200, control_2_4['max_speed'])
+
+        # calculate remaining distance with new start time
+        remain_control_dist = control - 400
+        raw_time_3 = control_calc(remain_control_dist, control_4_6['max_speed'])
+
+        total_raw_time = raw_time_1 + raw_time_2 + raw_time_3
+        time_result = convert_to_hm(total_raw_time)
+
+        hour = time_result['hour']
+        minute = time_result['minute']
+    elif control <= 1000:
+        # calculate when distance is <=200
+        raw_time_1 = control_calc(200, control_0_2['max_speed'])
+
+        # calculate when distance is <=400
+        raw_time_2 = control_calc(200, control_2_4['max_speed'])
+
+        # calculate when distance is <=600
+        raw_time_3 = control_calc(200, control_4_6['max_speed'])
+
+        # calculate remaining distance
+        remain_control_dist = control - 600
+        raw_time_4 = control_calc(remain_control_dist, control_6_10['max_speed'])
+
+        total_raw_time = raw_time_1 + raw_time_2 + raw_time_3 + raw_time_4
+        time_result = convert_to_hm(total_raw_time)
+
+        hour = time_result['hour']
+        minute = time_result['minute']
+
+    start_time = time.shift(hours=hour, minutes=minute)
+    return start_time
 
 
 def close_time(control_dist_km, brevet_dist_km, brevet_start_time):
     """
     Args:
-       control_dist_km:  number, control distance in kilometers
-          brevet_dist_km: number, nominal distance of the brevet
-          in kilometers, which must be one of 200, 300, 400, 600, or 1000
-          (the only official ACP brevet distances)
-       brevet_start_time:  An arrow object
+        control_dist_km:  number, control distance in kilometers
+        brevet_dist_km: number, nominal distance of the brevet
+        in kilometers, which must be one of 200, 300, 400, 600, or 1000
+        (the only official ACP brevet distances)
+        brevet_start_time:  An arrow object
     Returns:
-       An arrow object indicating the control close time.
-       This will be in the same time zone as the brevet start time.
+        An arrow object indicating the control close time.
+        This will be in the same time zone as the brevet start time.
     """
-    
-    
-    if control_dist_km < 0:
-        # control distance is neg
-        raise ValueError
-    elif control_dist_km == 0: 
-        # control distance is 0
-        return brevet_start_time.shift(minutes=+60)
-    elif control_dist_km <= 60: 
-        # special timing for gate closure when gate within 60km of start
-        minute_shift = round((control_dist_km/20) * 60 + 60)
-        return brevet_start_time.shift(minutes=+minute_shift)
-    elif control_dist_km >= int(brevet_dist_km):
-        control_dist_km = int(brevet_dist_km)
+    time = arrow.get(brevet_start_time)
+    hour = 0
+    minute = 0
 
-    control_close_time = brevet_start_time
-    hour_shift = 0
-    minute_shift = 0
+    # if the control is longer than the brevet, the calculation should be with brevet instead
+    if control_dist_km > brevet_dist_km:
+        control = brevet_dist_km
+    else:
+        control = control_dist_km
 
-    for dist_span in dist_spans:
-        if dist_span['start_dist'] < control_dist_km <= dist_span['end_dist']:
-            slowest = (control_dist_km - dist_span['start_dist']) / dist_span['min_speed']
+    # if the control is 0, close time should be 1hr
+    if control == 0:
+        hour = 1
+    elif control <= 60:
+        total_raw_time = control_calc(control, 20)
+        time_result = convert_to_hm(total_raw_time)
 
-            minute_shift += slowest * 60
-            break
-        else:
-            added = (dist_span['end_dist'] - dist_span['start_dist']) / dist_span['min_speed']
-            minute_shift += added * 60
-        
-    control_close_time = control_close_time.shift(minutes=+round(minute_shift))
-    return control_close_time
+        hour = time_result['hour'] + 1
+        minute = time_result['minute']
+    # time limits for races
+    elif control == 200 and brevet_dist_km == 200:
+        hour = 13
+        minute = 30
+    elif control == 300 and brevet_dist_km == 300:
+        hour = 20
+        minute = 0
+    elif control == 400 and brevet_dist_km == 400:
+        hour = 27
+        minute = 0
+    elif control == 600 and brevet_dist_km == 600:
+        hour = 40
+        minute = 0
+    elif control == 1000 and brevet_dist_km == 1000:
+        hour = 75
+        minute = 0
+
+    elif control <= 600:
+        total_raw_time = control_calc(control, control_0_2['min_speed'])
+        time_result = convert_to_hm(total_raw_time)
+
+        hour = time_result['hour']
+       

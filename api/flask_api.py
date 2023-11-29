@@ -17,7 +17,7 @@ app = Flask(__name__)
 api = Api(app)
 
 # Bind resources to paths here:
-api.add_resource(Brevet, '/api/brevet/<int:brevet_id>')
+api.add_resource(Brevet, '/api/brevet/<brevet_id>')
 api.add_resource(Brevets, '/api/brevets')
 
 #############
